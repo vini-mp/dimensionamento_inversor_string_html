@@ -119,6 +119,11 @@
   /* placeholder em cinza claro, valor preenchido em preto */
   .field input[type="number"]::placeholder { color: #a8d8e8; font-weight: 400; opacity: 1; }
   .field input:focus { border-color: var(--bg-deeper); box-shadow: 0 0 0 3px var(--accent-glow); }
+  /* Estilo aplicado ao campo quando a validação identifica alguma inconsistência */
+  .field input.input-error {
+    background: #ffd6d6 !important; border-color: #d93030 !important;
+    box-shadow: 0 0 0 3px rgba(217,48,48,0.25) !important; color: #6b0000 !important;
+  }
   /* Caixa somente leitura para exibir valores calculados (utilizada no Voc corrigido) */
   .field .derived {
     background: rgba(66,203,245,0.18); border: 2px solid rgba(66,203,245,0.35);
@@ -142,6 +147,27 @@
     font-size: 0.88rem; font-weight: 600; color: var(--accent);
     margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase;
   }
+
+  /* BOTÕES PRINCIPAIS */
+  .btn-calc {
+    display: block; width: 100%; padding: 16px;
+    background: var(--accent); color: #0a2a3a; border: none;
+    border-radius: 12px; font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.05rem; font-weight: 700; letter-spacing: 0.01em;
+    cursor: pointer; transition: opacity 0.18s, transform 0.12s, box-shadow 0.18s;
+    box-shadow: 0 4px 24px rgba(66,203,245,0.35);
+  }
+  .btn-calc:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 8px 32px rgba(66,203,245,0.45); }
+  .btn-calc:active:not(:disabled) { transform: translateY(0); }
+  .btn-calc:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+  /* ERROR BANNER */
+  .error-banner {
+    background: rgba(217,48,48,0.18); border: 1.5px solid rgba(217,48,48,0.5);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+    font-size: 0.85rem; color: #ffaaaa; display: none;
+  }
+  .error-banner.visible { display: block; }
 
 </style>
 </head>
@@ -253,6 +279,11 @@
     <div id="mpptFields"></div>
   </div>
 
+  <!-- Aviso exibido quando a validação dos campos identifica erros -->
+  <div class="error-banner" id="errorBanner"></div>
+
+  <button class="btn-calc" id="btnCalc" onclick="calcular()">⚡ Calcular Dimensionamento</button>
+
 </div>
 
 <script>
@@ -269,6 +300,43 @@ function calcVocCorr() {
     el.textContent = corr.toFixed(4) + ' V';
     el.dataset.val = corr;
   } else { el.textContent = '—'; el.dataset.val = ''; }
+}
+
+// ── Validação ─────────────────────────────────────────────────────────────────
+function validarCampos() {
+  const voc = parseFloat(document.getElementById('voc').value);
+  const icc = parseFloat(document.getElementById('icc').value);
+  const vmax = parseFloat(document.getElementById('vmax').value);
+  const imax = parseFloat(document.getElementById('imax').value);
+  const vMaxEnt = parseFloat(document.getElementById('vMaxEnt').value);
+  const vPartida = parseFloat(document.getElementById('vPartida').value);
+  // Cada regra não atendida destaca os dois campos envolvidos e registra uma mensagem de erro
+  const erros = [];
+  // O Voc deve ser sempre maior que o Vmax
+  const e1 = !isNaN(voc) && !isNaN(vmax) && voc <= vmax;
+  setError('voc', e1); setError('vmax', e1);
+  if (e1) erros.push('Voc deve ser maior que Vmax.');
+  // Regra análoga para a corrente: o Icc deve ser maior que o Imax
+  const e2 = !isNaN(icc) && !isNaN(imax) && icc <= imax;
+  setError('icc', e2); setError('imax', e2);
+  if (e2) erros.push('Icc deve ser maior que Imax.');
+  // A tensão máxima de entrada deve ser maior que a tensão de partida
+  const e3 = !isNaN(vMaxEnt) && !isNaN(vPartida) && vMaxEnt <= vPartida;
+  setError('vMaxEnt', e3); setError('vPartida', e3);
+  if (e3) erros.push('Tensão Máxima de Entrada deve ser maior que a Tensão de Partida.');
+  // Havendo erros, exibe o aviso e desabilita o botão de cálculo
+  const banner = document.getElementById('errorBanner');
+  const btn = document.getElementById('btnCalc');
+  if (erros.length > 0) {
+    banner.innerHTML = '⚠️ <strong>Atenção — corrija os seguintes problemas:</strong><br>' + erros.map(e => '• ' + e).join('<br>');
+    banner.classList.add('visible'); btn.disabled = true;
+  } else { banner.classList.remove('visible'); btn.disabled = false; }
+}
+
+function setError(id, hasError) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  hasError ? el.classList.add('input-error') : el.classList.remove('input-error');
 }
 
 // ── Render MPPT ───────────────────────────────────────────────────────────────
