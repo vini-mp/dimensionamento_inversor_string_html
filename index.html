@@ -128,6 +128,21 @@
 
   .divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 22px 0; }
 
+  /* Linha do checkbox que indica se os MPPT são iguais */
+  .toggle-row { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+  .toggle-row label { font-size: 0.9rem; color: var(--text); cursor: pointer; }
+  .toggle-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+
+  /* Bloco com os campos de especificação de cada MPPT */
+  .mppt-block {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
+  }
+  .mppt-block h4 {
+    font-size: 0.88rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
 </style>
 </head>
 <body>
@@ -203,6 +218,41 @@
     </div>
   </div>
 
+  <!-- INVERSOR -->
+  <div class="card">
+    <div class="card-title">Dados do Inversor</div>
+    <div class="grid-2">
+      <div class="field">
+        <label>Potência Máxima de Entrada CC (W)</label>
+        <input type="number" id="pMaxCC" step="1" placeholder="Ex: 8000">
+      </div>
+      <div class="field">
+        <label>Tensão Máxima de Entrada (V)</label>
+        <input type="number" id="vMaxEnt" step="0.1" placeholder="Ex: 1000" oninput="validarCampos();">
+      </div>
+      <div class="field">
+        <label>Tensão Máxima da Faixa de Operação (V)</label>
+        <input type="number" id="vMaxOp" step="0.1" placeholder="Ex: 800">
+      </div>
+      <div class="field">
+        <label>Tensão de Partida (V)</label>
+        <input type="number" id="vPartida" step="0.1" placeholder="Ex: 200" oninput="validarCampos();">
+      </div>
+      <div class="field">
+        <label>Número de MPPT</label>
+        <input type="number" id="nMPPT" step="1" min="1" max="10" placeholder="Ex: 2" oninput="renderMPPT()">
+      </div>
+    </div>
+    <hr class="divider">
+    <!-- Quando marcado, as mesmas especificações são aplicadas a todos os MPPT -->
+    <div class="toggle-row">
+      <input type="checkbox" id="mpptIguais" checked onchange="renderMPPT()">
+      <label for="mpptIguais">Os MPPT são iguais (mesmas especificações para todos)</label>
+    </div>
+    <!-- Os campos de cada MPPT são gerados dinamicamente pela função renderMPPT() -->
+    <div id="mpptFields"></div>
+  </div>
+
 </div>
 
 <script>
@@ -221,6 +271,33 @@ function calcVocCorr() {
   } else { el.textContent = '—'; el.dataset.val = ''; }
 }
 
+// ── Render MPPT ───────────────────────────────────────────────────────────────
+function renderMPPT() {
+  const n = parseInt(document.getElementById('nMPPT').value) || 0;
+  const iguais = document.getElementById('mpptIguais').checked;
+  const cont = document.getElementById('mpptFields');
+  cont.innerHTML = '';
+  if (n < 1) return;
+  // Se os MPPT forem iguais, exibe um único bloco; caso contrário, cria um bloco para cada MPPT
+  if (iguais) {
+    cont.innerHTML = `<div class="mppt-block"><h4>Especificações dos MPPT (todos iguais)</h4><div class="grid-3">
+      <div class="field"><label>Corrente Máx. de Entrada por MPPT (A)</label><input type="number" id="iMaxMPPT_0" step="0.01" placeholder="Ex: 12.5"></div>
+      <div class="field"><label>Corrente Máx. de Curto por MPPT (A)</label><input type="number" id="iCurtMPPT_0" step="0.01" placeholder="Ex: 15.0"></div>
+      <div class="field"><label>Número de Entradas do MPPT</label><input type="number" id="nEntMPPT_0" step="1" min="1" placeholder="Ex: 2"></div>
+    </div></div>`;
+  } else {
+    for (let i = 0; i < n; i++) {
+      cont.innerHTML += `<div class="mppt-block"><h4>MPPT ${i+1}</h4><div class="grid-3">
+        <div class="field"><label>Corrente Máx. de Entrada (A)</label><input type="number" id="iMaxMPPT_${i}" step="0.01" placeholder="Ex: 12.5"></div>
+        <div class="field"><label>Corrente Máx. de Curto (A)</label><input type="number" id="iCurtMPPT_${i}" step="0.01" placeholder="Ex: 15.0"></div>
+        <div class="field"><label>Número de Entradas</label><input type="number" id="nEntMPPT_${i}" step="1" min="1" placeholder="Ex: 2"></div>
+      </div></div>`;
+    }
+  }
+}
+
+// Init
+renderMPPT();
 </script>
 </body>
 </html>
