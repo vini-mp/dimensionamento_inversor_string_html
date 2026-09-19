@@ -364,6 +364,62 @@ function renderMPPT() {
   }
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+// Funções auxiliares para leitura dos campos (retornam 0 quando estão vazios)
+const gv  = id => parseFloat(document.getElementById(id)?.value) || 0;
+const gi  = id => parseInt(document.getElementById(id)?.value) || 0;
+const flr = v => Math.floor(v);
+const cel = v => Math.ceil(v);
+// Formata o número; valores NaN ou infinitos são exibidos como traço
+function fmtN(v, d = 2) { return isNaN(v) || !isFinite(v) ? '—' : v.toFixed(d); }
+
+// ── Calcular ──────────────────────────────────────────────────────────────────
+function calcular() {
+  // Leitura dos dados do módulo
+  const voc = gv('voc'), icc = gv('icc'), vmax = gv('vmax'), imax = gv('imax');
+  const wmod = gv('wmod'), coef = gv('coefTemp'), delta = gv('deltaTemp');
+  // Utiliza o Voc corrigido exibido em tela; caso ainda não tenha sido calculado, realiza o cálculo neste ponto
+  const vocCorr = parseFloat(document.getElementById('vocCorr').dataset.val) || (voc + (delta * (coef / 100) * voc));
+  document.getElementById('vocCorr').textContent = vocCorr.toFixed(4) + ' V';
+  document.getElementById('vocCorr').dataset.val = vocCorr;
+
+  // Leitura dos dados do inversor
+  const pMaxCC = gv('pMaxCC'), vMaxEnt = gv('vMaxEnt'), vMaxOp = gv('vMaxOp');
+  const vPartida = gv('vPartida'), nMPPT = gi('nMPPT') || 1;
+  const iguais = document.getElementById('mpptIguais').checked;
+
+  // Impede o cálculo caso algum campo obrigatório esteja vazio
+  if (!voc || !icc || !vmax || !imax || !wmod || !pMaxCC || !vMaxEnt || !vMaxOp || !vPartida) {
+    alert('Preencha todos os campos obrigatórios antes de calcular.'); return;
+  }
+
+  // Cálculos 1 a 4: limites de módulos por potência e por tensão
+  const calc1 = pMaxCC / wmod;
+  const calc2 = vMaxEnt / vocCorr;
+  const calc3 = vMaxOp / vocCorr;
+  const calc4 = vPartida / vmax;
+  // Os valores máximos são arredondados para baixo e o mínimo para cima, por segurança
+  const maxModPot  = flr(calc1);
+  const maxModMPPT = flr(Math.min(calc2, calc3));
+  const minModMPPT = cel(calc4);
+
+  // Cálculos 5 e 6: limites de corrente, realizados separadamente para cada MPPT
+  const mpptData = [];
+  for (let i = 0; i < nMPPT; i++) {
+    // Se os MPPT forem iguais, todos utilizam os campos do primeiro (índice 0)
+    const idx = iguais ? 0 : i;
+    const iMaxM = parseFloat(document.getElementById(`iMaxMPPT_${idx}`)?.value) || 0;
+    const iCutM = parseFloat(document.getElementById(`iCurtMPPT_${idx}`)?.value) || 0;
+    const nEnt  = parseInt(document.getElementById(`nEntMPPT_${idx}`)?.value) || 1;
+    const calc5 = imax > 0 ? iMaxM / imax : NaN;
+    const calc6 = icc  > 0 ? iCutM / icc  : NaN;
+    // Adota-se o menor valor entre os cálculos 5 e 6, limitado ao número de entradas do MPPT
+    const menorRatio = Math.min(isNaN(calc5) ? Infinity : calc5, isNaN(calc6) ? Infinity : calc6);
+    const entradasUtil = isFinite(menorRatio) ? Math.min(flr(menorRatio), nEnt) : nEnt;
+    mpptData.push({ label: `MPPT ${i+1}`, iMaxM, iCutM, nEnt, calc5, calc6, entradasUtil });
+  }
+}
+
 // Init
 renderMPPT();
 </script>
