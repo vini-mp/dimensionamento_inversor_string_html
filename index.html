@@ -161,6 +161,27 @@
   .btn-calc:active:not(:disabled) { transform: translateY(0); }
   .btn-calc:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
+  /* Botões pós-cálculo */
+  .post-calc-btns {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .post-calc-btns.visible { display: grid; }
+
+  .btn-action {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 14px; border: none; border-radius: 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem; font-weight: 700; cursor: pointer;
+    transition: opacity 0.18s, transform 0.12s;
+  }
+  .btn-action:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-action:active { transform: translateY(0); }
+  .btn-action svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .btn-export { background: rgba(66,203,245,0.15); color: var(--accent); border: 1.5px solid rgba(66,203,245,0.4); }
+
   /* A área de resultados permanece oculta até a execução do cálculo */
   #results { display: none; }
 
@@ -367,6 +388,16 @@
   <div class="error-banner" id="errorBanner"></div>
 
   <button class="btn-calc" id="btnCalc" onclick="calcular()">⚡ Calcular Dimensionamento</button>
+
+  <!-- Botões pós-cálculo -->
+  <div class="post-calc-btns" id="postCalcBtns">
+    <button class="btn-action btn-export" onclick="exportarDados()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Exportar Dados
+    </button>
+  </div>
 
   <!-- RESULTADOS -->
   <div id="results" style="margin-top:28px;">
@@ -594,8 +625,90 @@ function calcular() {
   document.getElementById('mainResults').innerHTML = html;
   // Exibe a área de resultados
   document.getElementById('results').style.display = 'block';
+  // Exibe os botões de exportar dados e gerar PDF
+  document.getElementById('postCalcBtns').classList.add('visible');
   // Rola a página suavemente até os resultados
   document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Exportar ──────────────────────────────────────────────────────────────────
+function coletarDados() {
+  // Reúne os valores preenchidos nos campos em um único objeto para exportação
+  const n = gi('nMPPT') || 1;
+  const iguais = document.getElementById('mpptIguais').checked;
+  const mppts = [];
+  for (let i = 0; i < n; i++) {
+    const idx = iguais ? 0 : i;
+    mppts.push({
+      iMaxMPPT: document.getElementById(`iMaxMPPT_${idx}`)?.value || '',
+      iCurtMPPT: document.getElementById(`iCurtMPPT_${idx}`)?.value || '',
+      nEntMPPT: document.getElementById(`nEntMPPT_${idx}`)?.value || '',
+    });
+  }
+  return {
+    voc: document.getElementById('voc').value,
+    icc: document.getElementById('icc').value,
+    vmax: document.getElementById('vmax').value,
+    imax: document.getElementById('imax').value,
+    wmod: document.getElementById('wmod').value,
+    coefTemp: document.getElementById('coefTemp').value,
+    deltaTemp: document.getElementById('deltaTemp').value,
+    pMaxCC: document.getElementById('pMaxCC').value,
+    vMaxEnt: document.getElementById('vMaxEnt').value,
+    vMaxOp: document.getElementById('vMaxOp').value,
+    vPartida: document.getElementById('vPartida').value,
+    nMPPT: document.getElementById('nMPPT').value,
+    mpptIguais: iguais,
+    mppts,
+  };
+}
+
+function exportarDados() {
+  const dados = coletarDados();
+  // Gera o arquivo .json em memória e inicia o download
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'dimensionamento_string.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Importar ──────────────────────────────────────────────────────────────────
+function importarDados() { document.getElementById('fileInput').click(); }
+
+function lerArquivo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      // Preenche o campo somente se o valor existir no arquivo importado
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+      set('voc', d.voc); set('icc', d.icc); set('vmax', d.vmax); set('imax', d.imax);
+      set('wmod', d.wmod); set('coefTemp', d.coefTemp); set('deltaTemp', d.deltaTemp);
+      set('pMaxCC', d.pMaxCC); set('vMaxEnt', d.vMaxEnt); set('vMaxOp', d.vMaxOp);
+      set('vPartida', d.vPartida); set('nMPPT', d.nMPPT);
+      document.getElementById('mpptIguais').checked = d.mpptIguais !== false;
+      renderMPPT();
+      // Preencher MPPT após render
+      if (d.mppts && d.mppts.length > 0) {
+        const iguais = d.mpptIguais !== false;
+        const n = parseInt(d.nMPPT) || 1;
+        for (let i = 0; i < n; i++) {
+          const idx = iguais ? 0 : i;
+          const src = iguais ? d.mppts[0] : (d.mppts[i] || {});
+          set(`iMaxMPPT_${idx}`, src.iMaxMPPT);
+          set(`iCurtMPPT_${idx}`, src.iCurtMPPT);
+          set(`nEntMPPT_${idx}`, src.nEntMPPT);
+        }
+      }
+      calcVocCorr(); validarCampos();
+    } catch { alert('Arquivo inválido. Certifique-se de importar um arquivo exportado por este sistema.'); }
+    // Limpa o campo de arquivo para permitir nova importação do mesmo arquivo
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // Init
