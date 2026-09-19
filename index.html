@@ -2,9 +2,46 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<!-- viewport para layout funcionar adequadamente no celular -->
+<!-- Configuração de viewport para adequar o layout a dispositivos móveis -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dimensionamento de Inversor String</title>
+<!-- Estilos da página, mantidos no próprio arquivo para simplificar a distribuição -->
+<style>
+  /* Fontes do Google Fonts: Inter para o texto e Space Grotesk para os títulos */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+  /* Redefine as margens e os espaçamentos internos padrão do navegador */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Variáveis de cor, para facilitar futuras alterações no tema visual */
+  :root {
+    --bg: #426cf5;
+    --bg-deeper: #1a30a0;
+    --input-color: #42cbf5;
+    --input-text: #0a2030;
+    --card-bg: rgba(255,255,255,0.08);
+    --card-border: rgba(255,255,255,0.18);
+    --text: #ffffff;
+    --text-muted: rgba(255,255,255,0.65);
+    --accent: #42cbf5;
+    --accent-glow: rgba(66,203,245,0.3);
+    --result-bg: rgba(66,203,245,0.12);
+    --result-border: rgba(66,203,245,0.4);
+  }
+
+  /* Fundo azul com dois gradientes radiais sobrepostos */
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(66,203,245,0.18) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 90%, rgba(26,48,160,0.5) 0%, transparent 55%);
+    min-height: 100vh;
+    color: var(--text);
+    padding: 0 0 60px;
+  }
+
+</style>
 </head>
 <body>
 
