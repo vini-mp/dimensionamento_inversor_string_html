@@ -161,6 +161,33 @@
   .btn-calc:active:not(:disabled) { transform: translateY(0); }
   .btn-calc:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
+  /* A área de resultados permanece oculta até a execução do cálculo */
+  #results { display: none; }
+
+  /* Caixa suspensa conferência */
+  .conf-summary {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px; cursor: pointer; user-select: none;
+    list-style: none; font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem; font-weight: 700; color: var(--accent);
+    gap: 12px; transition: background 0.15s; border-radius: 14px;
+  }
+  .conf-summary::-webkit-details-marker { display: none; }
+  .conf-summary:hover { background: rgba(66,203,245,0.06); }
+  .conf-arrow { width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.22s ease; color: var(--accent); }
+  details[open] .conf-arrow { transform: rotate(180deg); }
+  .conf-body { padding: 0 22px 20px; overflow-x: auto; }
+
+  /* Tabela de valores de conferência */
+  .check-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .check-table th {
+    background: rgba(66,203,245,0.1); color: var(--accent); font-weight: 600;
+    padding: 10px 14px; text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .check-table td { padding: 9px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); color: var(--text); }
+  .check-table tr:last-child td { border-bottom: none; }
+  .check-table .val { font-weight: 700; color: #b0f0ff; font-family: 'Space Grotesk', monospace; }
+
   /* ERROR BANNER */
   .error-banner {
     background: rgba(217,48,48,0.18); border: 1.5px solid rgba(217,48,48,0.5);
@@ -284,6 +311,25 @@
 
   <button class="btn-calc" id="btnCalc" onclick="calcular()">⚡ Calcular Dimensionamento</button>
 
+  <!-- RESULTADOS -->
+  <div id="results" style="margin-top:28px;">
+    <div class="card">
+      <details id="confDetails">
+        <summary class="conf-summary">
+          <span>📋 Valores de Conferência</span>
+          <svg class="conf-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </summary>
+        <div class="conf-body">
+          <table class="check-table">
+            <thead><tr><th>#</th><th>Descrição</th><th>Cálculo</th><th class="val">Resultado</th></tr></thead>
+            <tbody id="confBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -418,6 +464,24 @@ function calcular() {
     const entradasUtil = isFinite(menorRatio) ? Math.min(flr(menorRatio), nEnt) : nEnt;
     mpptData.push({ label: `MPPT ${i+1}`, iMaxM, iCutM, nEnt, calc5, calc6, entradasUtil });
   }
+
+  // Tabela conferência
+  let rows = `
+    <tr><td>1</td><td>Potência máx. CC ÷ Potência do módulo</td><td>${pMaxCC} ÷ ${wmod}</td><td class="val">${fmtN(calc1)}</td></tr>
+    <tr><td>2</td><td>Tensão máx. de entrada ÷ Voc corrigido</td><td>${fmtN(vMaxEnt,1)} ÷ ${fmtN(vocCorr,4)}</td><td class="val">${fmtN(calc2)}</td></tr>
+    <tr><td>3</td><td>Tensão máx. faixa de operação ÷ Voc corrigido</td><td>${fmtN(vMaxOp,1)} ÷ ${fmtN(vocCorr,4)}</td><td class="val">${fmtN(calc3)}</td></tr>
+    <tr><td>4</td><td>Tensão de partida ÷ Vmax</td><td>${fmtN(vPartida,1)} ÷ ${fmtN(vmax,2)}</td><td class="val">${fmtN(calc4)}</td></tr>`;
+  mpptData.forEach(m => {
+    rows += `
+    <tr><td>5 (${m.label})</td><td>Corrente Máx. Entrada MPPT ÷ Imax módulo</td><td>${fmtN(m.iMaxM,2)} ÷ ${fmtN(imax,2)}</td><td class="val">${fmtN(m.calc5)}</td></tr>
+    <tr><td>6 (${m.label})</td><td>Corrente Máx. Curto MPPT ÷ Icc módulo</td><td>${fmtN(m.iCutM,2)} ÷ ${fmtN(icc,2)}</td><td class="val">${fmtN(m.calc6)}</td></tr>`;
+  });
+  document.getElementById('confBody').innerHTML = rows;
+
+  // Exibe a área de resultados
+  document.getElementById('results').style.display = 'block';
+  // Rola a página suavemente até os resultados
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Init
