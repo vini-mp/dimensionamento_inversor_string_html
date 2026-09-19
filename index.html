@@ -181,6 +181,7 @@
   .btn-action:active { transform: translateY(0); }
   .btn-action svg { width: 18px; height: 18px; flex-shrink: 0; }
   .btn-export { background: rgba(66,203,245,0.15); color: var(--accent); border: 1.5px solid rgba(66,203,245,0.4); }
+  .btn-pdf    { background: rgba(255,255,255,0.12); color: #fff;          border: 1.5px solid rgba(255,255,255,0.3); }
 
   /* A área de resultados permanece oculta até a execução do cálculo */
   #results { display: none; }
@@ -274,6 +275,11 @@
   }
   .error-banner.visible { display: block; }
 
+  /* ── PDF STYLES ─────────────────────────────────────────────────── */
+  /* Na impressão, a página principal é ocultada, pois o relatório é gerado em janela separada */
+  @media print {
+    body { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -397,6 +403,13 @@
       </svg>
       Exportar Dados
     </button>
+    <button class="btn-action btn-pdf" onclick="gerarPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Gerar PDF
+    </button>
   </div>
 
   <!-- RESULTADOS -->
@@ -511,6 +524,9 @@ const cel = v => Math.ceil(v);
 // Formata o número; valores NaN ou infinitos são exibidos como traço
 function fmtN(v, d = 2) { return isNaN(v) || !isFinite(v) ? '—' : v.toFixed(d); }
 
+// Estado global dos resultados (para PDF)
+let _snapshot = null;
+
 // ── Calcular ──────────────────────────────────────────────────────────────────
 function calcular() {
   // Leitura dos dados do módulo
@@ -556,6 +572,11 @@ function calcular() {
     const entradasUtil = isFinite(menorRatio) ? Math.min(flr(menorRatio), nEnt) : nEnt;
     mpptData.push({ label: `MPPT ${i+1}`, iMaxM, iCutM, nEnt, calc5, calc6, entradasUtil });
   }
+
+  // Salvar snapshot para PDF e exportação
+  _snapshot = { voc, icc, vmax, imax, wmod, coef, delta, vocCorr,
+    pMaxCC, vMaxEnt, vMaxOp, vPartida, nMPPT, iguais,
+    calc1, calc2, calc3, calc4, maxModPot, maxModMPPT, minModMPPT, mpptData };
 
   // Tabela conferência
   let rows = `
@@ -709,6 +730,136 @@ function lerArquivo(event) {
     event.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// ── Gerar PDF ─────────────────────────────────────────────────────────────────
+function gerarPDF() {
+  // O relatório só é gerado se o cálculo já tiver sido executado ao menos uma vez
+  if (!_snapshot) return;
+  const s = _snapshot;
+
+  // Monta a lista de módulos por MPPT para o relatório
+  const mpptLinhas = () => {
+    const algumMais = s.mpptData.some(m => m.nEnt > 1);
+    return s.mpptData.map(m => {
+      if (algumMais) {
+        let linhas = `<div style="font-weight:700;color:#1a30a0;margin-bottom:4px;">${m.label}</div>`;
+        for (let e = 1; e <= m.entradasUtil; e++)
+          linhas += `<div style="padding-left:20px;margin-bottom:2px;">Entrada ${e}: <strong>${s.maxModMPPT} módulos</strong></div>`;
+        return linhas;
+      } else {
+        return `<div style="margin-bottom:4px;">${m.label} — <strong>${s.maxModMPPT} módulos</strong></div>`;
+      }
+    }).join('');
+  };
+
+  // Gera as linhas da tabela de valores de conferência
+  const confRows = () => {
+    let r = `
+      <tr><td>1</td><td>Potência máx. CC ÷ Potência do módulo</td><td>${s.pMaxCC} ÷ ${s.wmod}</td><td><strong>${fmtN(s.calc1)}</strong></td></tr>
+      <tr><td>2</td><td>Tensão máx. de entrada ÷ Voc corrigido</td><td>${fmtN(s.vMaxEnt,1)} ÷ ${fmtN(s.vocCorr,4)}</td><td><strong>${fmtN(s.calc2)}</strong></td></tr>
+      <tr><td>3</td><td>Tensão máx. faixa de operação ÷ Voc corrigido</td><td>${fmtN(s.vMaxOp,1)} ÷ ${fmtN(s.vocCorr,4)}</td><td><strong>${fmtN(s.calc3)}</strong></td></tr>
+      <tr><td>4</td><td>Tensão de partida ÷ Vmax</td><td>${fmtN(s.vPartida,1)} ÷ ${fmtN(s.vmax,2)}</td><td><strong>${fmtN(s.calc4)}</strong></td></tr>`;
+    s.mpptData.forEach(m => {
+      r += `
+      <tr><td>5 (${m.label})</td><td>Corrente Máx. Entrada MPPT ÷ Imax módulo</td><td>${fmtN(m.iMaxM,2)} ÷ ${fmtN(s.imax,2)}</td><td><strong>${fmtN(m.calc5)}</strong></td></tr>
+      <tr><td>6 (${m.label})</td><td>Corrente Máx. Curto MPPT ÷ Icc módulo</td><td>${fmtN(m.iCutM,2)} ÷ ${fmtN(s.icc,2)}</td><td><strong>${fmtN(m.calc6)}</strong></td></tr>`;
+    });
+    return r;
+  };
+
+  // Caixa genérica com cabeçalho colorido
+  const box = (color, title, content) => `
+    <div style="border:2px solid ${color};border-radius:10px;margin-bottom:16px;overflow:hidden;page-break-inside:avoid;">
+      <div style="background:${color};padding:8px 14px;font-weight:700;font-size:13px;color:#fff;">${title}</div>
+      <div style="padding:12px 14px;font-size:13px;line-height:1.7;">${content}</div>
+    </div>`;
+
+  // Caixa de resultado com o valor em destaque
+  const resultBox = (color, title, desc, val) => `
+    <div style="border:2px solid ${color};border-radius:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;page-break-inside:avoid;">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:4px;padding-bottom:6px;border-bottom:1px solid #ddd;">${title}</div>
+        <div style="font-size:11px;color:#555;">${desc}</div>
+      </div>
+      <div style="text-align:center;min-width:80px;">
+        <div style="font-size:36px;font-weight:700;color:${color};line-height:1;">${val}</div>
+        <div style="font-size:10px;color:#888;margin-top:3px;text-transform:uppercase;letter-spacing:1px;">módulos</div>
+      </div>
+    </div>`;
+
+  // O relatório é um documento HTML independente, com estilos próprios para impressão
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Dimensionamento de Inversor String</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:Arial,sans-serif;background:#fff;color:#111;padding:30px;}
+      h1{font-size:18px;font-weight:700;color:#1a30a0;margin-bottom:4px;}
+      .subtitle{font-size:11px;color:#666;margin-bottom:24px;}
+      table{width:100%;border-collapse:collapse;font-size:12px;}
+      th{background:#1a30a0;color:#fff;padding:8px 10px;text-align:left;font-weight:600;}
+      td{padding:7px 10px;border-bottom:1px solid #e5e5e5;}
+      tr:last-child td{border-bottom:none;}
+      tr:nth-child(even) td{background:#f8f9ff;}
+      @media print{body{padding:10px;} .no-print{display:none;}}
+    </style></head><body>
+    <h1>⚡ Dimensionamento de Inversor String</h1>
+    <div class="subtitle">Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
+
+    ${box('#1a30a0','Dados do Módulo Fotovoltaico',`
+      <table>
+        <tr><td>Tensão de Circuito Aberto (Voc)</td><td><strong>${s.voc} V</strong></td>
+            <td>Corrente de Curto Circuito (Icc)</td><td><strong>${s.icc} A</strong></td></tr>
+        <tr><td>Tensão de Máxima Potência (Vmax)</td><td><strong>${s.vmax} V</strong></td>
+            <td>Corrente de Máxima Potência (Imax)</td><td><strong>${s.imax} A</strong></td></tr>
+        <tr><td>Potência do Módulo</td><td><strong>${s.wmod} W</strong></td>
+            <td>Coeficiente de Temperatura Voc</td><td><strong>-${s.coef} %/°C</strong></td></tr>
+        <tr><td>Variação de Temperatura</td><td><strong>${s.delta} °C</strong></td>
+            <td>Voc Corrigido pela Temperatura</td><td><strong>${fmtN(s.vocCorr,4)} V</strong></td></tr>
+      </table>
+    `)}
+
+    ${box('#1a30a0','Dados do Inversor',`
+      <table>
+        <tr><td>Potência Máxima de Entrada CC</td><td><strong>${s.pMaxCC} W</strong></td>
+            <td>Tensão Máxima de Entrada</td><td><strong>${s.vMaxEnt} V</strong></td></tr>
+        <tr><td>Tensão Máxima da Faixa de Operação</td><td><strong>${s.vMaxOp} V</strong></td>
+            <td>Tensão de Partida</td><td><strong>${s.vPartida} V</strong></td></tr>
+        <tr><td>Número de MPPT</td><td><strong>${s.nMPPT}</strong></td><td></td><td></td></tr>
+      </table>
+    `)}
+
+    ${box('#555','Valores de Conferência',`
+      <table>
+        <thead><tr><th>#</th><th>Descrição</th><th>Cálculo</th><th>Resultado</th></tr></thead>
+        <tbody>${confRows()}</tbody>
+      </table>
+    `)}
+
+    <div style="margin-top:8px;">
+      ${resultBox('#1a30a0','Quantidade máxima de módulos de acordo com a potência total',
+        `Potência máx. CC (${s.pMaxCC} W) ÷ Potência do módulo (${s.wmod} W) = ${fmtN(s.calc1)} → arredondado para baixo`,
+        s.maxModPot)}
+      ${resultBox('#c86000','Quantidade mínima de módulos por MPPT de acordo com a tensão de partida',
+        `Tensão de partida (${fmtN(s.vPartida,1)} V) ÷ Vmax (${fmtN(s.vmax,2)} V) = ${fmtN(s.calc4)} → arredondado para cima`,
+        s.minModMPPT)}
+    </div>
+
+    ${box('#1a6b3a','Quantidade máxima de módulos por MPPT',
+      `<div style="font-size:11px;color:#555;margin-bottom:10px;">Menor valor entre cálculos 5 e 6 de cada MPPT, arredondado para baixo</div>${mpptLinhas()}`
+    )}
+
+    <div class="no-print" style="margin-top:28px;text-align:center;">
+      <button onclick="window.print()" style="padding:12px 32px;background:#1a30a0;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+        🖨️ Imprimir / Salvar como PDF
+      </button>
+    </div>
+  </body></html>`;
+
+  // Abre o relatório em nova aba, onde é possível imprimir ou salvar como PDF
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 // Init
