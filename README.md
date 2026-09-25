@@ -24,11 +24,8 @@ O projeto é um único arquivo `index.html`, sem dependências e sem necessidade
 3. Preencha os dados do módulo fotovoltaico e do inversor.
 4. Clique em **Calcular Dimensionamento**.
 
-> As fontes (Inter e Space Grotesk) são carregadas do Google Fonts. Sem conexão com a internet a ferramenta continua funcionando, apenas com a fonte padrão do navegador.
+5. Acesso direto: https://vini-mp.github.io/dimensionamento_inversor_string_html/
 
-### Publicação no GitHub Pages (opcional)
-
-Em **Settings → Pages**, selecione a branch `main` e a pasta `/ (root)`. Após alguns instantes a ferramenta ficará disponível em um endereço público.
 
 ## Dados de entrada
 
@@ -136,13 +133,6 @@ O botão **Gerar PDF** abre o relatório em uma nova aba, contendo os dados info
 - CSS3
 - JavaScript (sem frameworks ou bibliotecas)
 
-## Estrutura do projeto
-
-```
-.
-├── index.html   # aplicação completa (HTML, CSS e JavaScript)
-└── README.md
-```
 
 ## Aviso
 
